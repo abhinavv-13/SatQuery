@@ -1,128 +1,131 @@
 # 🛰️ SatQuery AI
 
-**An agentic vision-language assistant for remote sensing imagery. Ask questions about satellite images in plain English and get answers backed by visual evidence.**
-
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-Frontend-61DAFB?logo=react&logoColor=black)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-UI-06B6D4?logo=tailwindcss&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-Models-EE4C2C?logo=pytorch&logoColor=white)
+![Hugging Face](https://img.shields.io/badge/Hugging_Face-Transformers-FFD21E?logo=huggingface&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-green)
+
+**An Interactive Vision-Language Assistant for Multimodal Remote Sensing Image Analysis through Text Queries**
+
+Ask questions about satellite imagery in plain language, with no GIS expertise or coding. SatQuery AI picks the right remote-sensing models for your query and returns the answer with visual evidence, confidence, and an execution trace.
 
 ---
 
 ## Overview
 
-Satellite imagery is useful for agriculture, disaster response, urban planning, forest monitoring, and water-resource assessment. But getting answers out of it usually means knowing GIS tools, picking the right model, and tuning task-specific parameters.
+Satellite imagery is used for agriculture, disaster management, urban planning, forest monitoring, and water-resource assessment. But most remote-sensing AI is built for one task only (classification, detection, VQA, or change detection), and using it means understanding GIS workflows, model selection, and task-specific parameters. A generic LLM or VLM can't handle SAR, multispectral, or multi-date imagery reliably either.
 
-Most remote-sensing AI is also built as a single-task tool (only classification, only detection, only change detection), and a generic VLM can't handle SAR, multispectral bands, or multi-date pairs reliably.
+SatQuery AI is an agentic, query-driven system. It understands the query, validates the images, selects and runs the right specialist models, fuses their outputs, and returns an evidence-grounded response.
 
-**SatQuery AI** fixes this with an agentic layer on top of specialist remote-sensing models. You upload imagery and type a question. The system validates the inputs, picks the right model(s), runs them, fuses the outputs, and returns:
+Example queries:
 
-- a text answer
-- visual evidence (highlighted regions, bounding boxes, change maps)
-- a confidence estimate
-- an execution trace showing exactly which models ran and with what parameters
-
-```
-"What changed between these two dates, and where?"
-"Highlight the water body in this image."
-"Use the optical and SAR images together to find built-up and water-covered regions."
-"Has the built-up area increased, decreased, or stayed the same?"
-```
+- *Describe the land-cover and major objects visible in this image.*
+- *Highlight the water body referred to in the query.*
+- *What changed between these two dates, and where did the change occur?*
+- *Use the optical and SAR images together to identify built-up and water-covered regions.*
+- *Has the built-up area increased, decreased, or remained unchanged?*
 
 ---
 
 ## Features
 
-| Capability | Description |
-|---|---|
-| **Single-image VQA** | Ask free-form questions about an optical/multispectral or SAR image |
-| **Captioning / Grounding** | Scene description and text-guided region highlighting |
-| **Change analysis** | Change description, change-based VQA, and change maps from bi-temporal pairs |
-| **Optical–SAR analysis** | Joint extraction from co-registered optical and SAR pairs (e.g. built-up and water regions) |
-| **Agentic orchestration** | Query → task classification → input validation → model selection → execution → fusion |
-| **Evidence-grounded output** | Annotations, bounding boxes, change maps, confidence score |
-| **Auditable execution trace** | Selected task, models/tools used, permitted parameters, and outputs |
-| **Report export** | Download results as a report |
-| **Model registry** | Plug in new specialist models without touching the core |
+- **Natural-language interface** for satellite imagery, no GIS expertise needed
+- **Intelligent AI orchestrator** that understands the query and imagery, then routes the task to the right model
+- **Domain-specific models** instead of a generic vision model
+- **Single-image analysis:** VQA, captioning / scene description, text-guided region grounding
+- **Change analysis:** change description and change-based VQA from bi-temporal pairs, with change maps
+- **Optical–SAR analysis:** complementary information from co-registered optical/multispectral and SAR pairs
+- **Unified visual analytics:** textual answer + annotations, bounding boxes, and change maps together
+- **Confidence + execution trace:** selected task, models/tools used, key parameters
+- **Downloadable reports**
+- **Model registry:** add new specialist models without touching the core
+
+### Supported inputs
+
+- **Single image:** one optical / multispectral / SAR image
+- **Cross-modal pair:** co-registered optical/multispectral + SAR of the same area
+- **Bi-temporal pair:** two images of the same area from different dates
+
+Formats: GeoTIFF / TIFF. PNG and JPEG only for public benchmark datasets.
 
 ---
 
-## How it works
+## Architecture
 
 ```mermaid
 flowchart TD
-    A[User: images + natural-language query] --> B[Input Validation<br/>count · modality · format · metadata · compatibility]
-    B --> C[Intent Classifier]
-    C --> D{Analysis or Chat?}
-    D -- Chat --> E[LLM Chat Layer]
-    D -- Satellite analysis --> F[Task Router / Orchestrator]
-    R[(Model Registry)] --> F
-    F --> G[VQA · Captioning · Grounding]
-    F --> H[Temporal Comparison<br/>registration · change detection · change VQA]
-    F --> I[Optical–SAR Fusion]
-    G --> J[Result Fusion<br/>integration · evidence · confidence · validation]
-    H --> J
-    I --> J
-    E --> K
-    J --> K[Output Generation<br/>text · visual evidence · metadata]
-    K --> L[Web Interface]
+    U[User] --> IN[Multimodal Input<br/>Images: Optical / SAR + Natural-Language Query]
+    IN --> UND[Query and Input Understanding]
+    UND --> ID[Query Intent Detection]
+    UND --> VAL[Image / Metadata Validation]
+    UND --> TM[Task and Modality Identification]
+    IN --> COL[Image Information Collector<br/>Metadata · Dimensions · Modality · Statistics]
+    REG[(Model Directory / Registry<br/>Add specialist models without changing core)] --> ORCH
+    ID --> ORCH
+    VAL --> ORCH
+    TM --> ORCH
+    COL --> ORCH[AI Orchestrator<br/>Task Routing · Model Selection · Input Validation · Workflow Planning]
+    ORCH --> SW{Analysis or Chat?}
+    SW -- Normal chat --> CHAT[LLM Chat Layer<br/>Natural conversation · General questions · Contextual responses]
+    SW -- Satellite analysis --> WF[Analysis Workflow]
+    WF --> VQA[Visual Question Answering<br/>VQA · Grounding · Object Detection · Scene Understanding]
+    WF --> TMP[Temporal Comparison<br/>Change Analysis · Registration · Difference Detection]
+    WF --> SAR[Multimodal SAR<br/>Optical-SAR Fusion · Cross-Modal Fusion · SAR Interpretation]
+    CHAT --> FUS
+    VQA --> FUS
+    TMP --> FUS
+    SAR --> FUS[Result Fusion and Formatting<br/>Result Integration · Evidence · Confidence · Validation]
+    FUS --> OUT[Output Generation]
+    OUT --> T[Textual Answer<br/>Explanation · Findings · Confidence]
+    OUT --> V[Visual Evidence<br/>Annotations · Bounding Boxes · Change Maps]
+    OUT --> M[Analysis Metadata<br/>Models Used · Modality · Processing Summary]
+    T --> WEB[Web Interface]
+    V --> WEB
+    M --> WEB
+    WEB --> END[Interactive Multimodal Decision-Support Experience]
 ```
 
-**Pipeline stages**
+Flow in short: **User Input → Intent Classifier → Task Router → Specialist Model → Result Fusion → Output**
 
-1. **Input understanding:** checks image count, modality, format, and metadata, and collects dimensions and statistics.
-2. **Intent detection:** works out what the user wants to analyse.
-3. **Orchestrator:** selects the workflow and models from the registry, and sets only permitted parameters.
-4. **Specialist execution:** runs VQA, grounding, change detection, or optical–SAR analysis.
-5. **Result fusion:** combines text and spatial outputs, estimates confidence, and validates results.
-6. **Output generation:** returns the answer, visual evidence, and an execution summary.
-
----
-
-## Supported inputs
-
-| Input type | Description | Used for |
-|---|---|---|
-| Single image | One optical / multispectral / SAR image | VQA, captioning, grounding |
-| Cross-modal pair | Co-registered optical + SAR of the same area | Joint information extraction |
-| Bi-temporal pair | Two images of the same area at different times | Change detection, description, change VQA |
-
-**Formats:** GeoTIFF / TIFF for geospatial imagery. PNG / JPEG are accepted only for public benchmark datasets.
+- **Multimodal input:** accepts satellite images + natural-language queries
+- **Input understanding:** validates images, metadata, and supported modalities
+- **Intent detection / task identification:** works out what to analyse and which image type is needed
+- **AI orchestrator:** routes each request to the right workflow and selects specialist models dynamically
+- **Specialist analysis:** VQA, change detection, SAR analysis
+- **Model registry:** lets new models be added easily
+- **Information collector:** extracts image metadata and statistics
+- **Result fusion:** combines outputs and supporting evidence
+- **Output generation:** explanations, visual evidence, and metadata
+- **Web interface:** shows everything in an interactive UI
 
 ---
 
-## Remote-sensing adaptation
+## User Interface
 
-A general-purpose VLM isn't enough here, so at least one visual / vision-language component is adapted to remote sensing data.
-
-| Purpose | Dataset |
-|---|---|
-| Image–text adaptation on multisensor data | [BigEarthNet](https://huggingface.co/datasets/bigearthnet) |
-| Captioning, grounding, VQA evaluation | VRSBench, RSVQA |
-| Change-based VQA evaluation | CDVQA |
-| Optical–SAR paired data | SEN1-2 |
-
-Related work this project builds on or draws from: GeoChat, ChangeChat, RS-ChatGPT, Chat2Geo, Prithvi-100M, AlphaEarth, DOTA.
+- Map / image viewer with layers: **Optical, SAR, NDVI, Change Map**
+- Query bar for natural-language questions
+- Preset queries: *Describe scene*, *Detect water*, *What changed?*
+- Recent investigations list
+- Answer panel with **answer, confidence, models used, execution summary, and visual evidence**
 
 ---
 
-## Tech stack
+## Tech Stack
 
-| Layer | Tools |
-|---|---|
-| Frontend | React.js, Tailwind CSS, JavaScript |
-| Backend | FastAPI, Python, REST API, JSON |
-| ML / RS | PyTorch, Hugging Face Transformers, OpenCV, NumPy, Pillow |
-| LLM | Together AI (chat layer) |
-| Infra | GPU / cloud GPU for inference |
-| Tooling | Git, GitHub |
+- **Languages / core:** Python, JavaScript
+- **AI / ML:** PyTorch, Hugging Face Transformers, OpenCV, Pillow, NumPy
+- **LLM:** Together AI
+- **Backend:** FastAPI (REST API, JSON)
+- **Frontend:** React.js, Tailwind CSS
+- **Hardware:** GPU / Cloud GPU for inference
+- **Version control:** Git, GitHub
 
 ---
 
-## Project structure
-
-> Suggested layout. Adjust to match the repo.
+## Project Structure
 
 ```
 satquery-ai/
@@ -130,40 +133,37 @@ satquery-ai/
 │   ├── app/
 │   │   ├── main.py              # FastAPI entrypoint
 │   │   ├── api/                 # REST routes
-│   │   ├── orchestrator/        # intent classifier, router, planner
-│   │   ├── registry/            # model/tool registry
-│   │   ├── preprocessing/       # validation, normalization, metadata
+│   │   ├── preprocessing/       # input validation, normalization, metadata + statistics
+│   │   ├── orchestrator/        # intent detection, task routing, model selection, workflow planning
+│   │   ├── registry/            # model / tool registry
+│   │   ├── chat/                # LLM chat layer (Together AI)
 │   │   ├── tools/
-│   │   │   ├── vqa/
-│   │   │   ├── grounding/
-│   │   │   ├── change/
-│   │   │   └── optical_sar/
-│   │   ├── fusion/              # result fusion + confidence
-│   │   └── reports/             # report generation
+│   │   │   ├── vqa/             # VQA, captioning, scene understanding
+│   │   │   ├── grounding/       # text-guided region grounding, object detection
+│   │   │   ├── change/          # registration, change detection, change VQA
+│   │   │   └── optical_sar/     # optical-SAR fusion and interpretation
+│   │   ├── fusion/              # result fusion, evidence, confidence
+│   │   └── reports/             # downloadable report generation
 │   ├── training/                # BigEarthNet adaptation scripts
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
 │   └── package.json
 ├── docs/
+├── .env.example
+├── LICENSE
 └── README.md
 ```
 
 ---
 
-## Getting started
-
-### Prerequisites
-
-- Python 3.10+
-- Node.js 18+
-- CUDA-capable GPU recommended for the larger models (lightweight models can run on CPU)
+## Getting Started
 
 ### 1. Clone
 
 ```bash
-git clone https://github.com/abhinavv-13/satquery-ai.git
-cd satquery-ai
+git clone https://github.com/abhinavv-13/<repo-name>.git
+cd <repo-name>
 ```
 
 ### 2. Backend
@@ -175,12 +175,10 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file:
+Add your LLM key in a `.env` file:
 
 ```env
 TOGETHER_API_KEY=your_key_here
-MODEL_DIR=./models
-DEVICE=cuda                      # or cpu
 ```
 
 Run the API:
@@ -197,98 +195,76 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`.
-
 ---
 
 ## Usage
 
-1. Upload one image, an optical + SAR pair, or a before/after pair.
-2. SatQuery AI checks the inputs and shows what it detected (modality, format, compatibility).
-3. Type a question, or use a preset (*Describe scene*, *Detect water*, *What changed?*).
-4. Review the answer, visual evidence, confidence, and execution trace.
+1. Upload a single image, an optical + SAR pair, or a before/after pair (GeoTIFF / TIFF).
+2. The system checks the input (number of images, modality, format, metadata, compatibility).
+3. Type a question or pick a preset.
+4. Read the answer and check the visual evidence, confidence, and execution summary.
 5. Download the report.
 
-### Example API call
+---
 
-```bash
-curl -X POST http://localhost:8000/api/query \
-  -F "images=@before.tif" \
-  -F "images=@after.tif" \
-  -F "query=What changed between these two dates, and where?"
-```
+## Datasets and References
 
-```json
-{
-  "task": "change_vqa",
-  "answer": "...",
-  "confidence": 0.0,
-  "evidence": { "change_map": "...", "regions": [] },
-  "trace": {
-    "models": ["..."],
-    "parameters": {},
-    "steps": []
-  }
-}
-```
+- **[BigEarthNet](https://huggingface.co/datasets/bigearthnet):** 590k+ patches, used to adapt the vision-language component to remote sensing
+- **[VRSBench](https://github.com/Chen-Delin/VRSBench):** 100k+ image-text pairs; evaluates captioning, grounding, and VQA
+- **[RSVQA](https://ieeexplore.ieee.org/document/9172634):** foundational VQA methodology for satellite imagery
+- **[CDVQA / SECOND](https://arxiv.org/abs/2305.16318):** change detection and change-based VQA
+- **[SEN1-2](https://github.com/leonardobeno/SEN1-2):** 282k paired Sentinel-1 (SAR) and Sentinel-2 (optical) patches
+- **[DOTA](https://captain-whu.github.io/DOTA/):** oriented object detection and grounding
+- **[GeoChat](https://arxiv.org/abs/2311.15826):** conversational RS VLM with region grounding
+- **[Prithvi-100M](https://huggingface.co/ibm-nasa-geospatial/Prithvi-100M):** NASA/IBM geospatial foundation model
+- **ChangeChat, RS-ChatGPT, Chat2Geo, AlphaEarth:** related work on change captioning, LLM + RS integration, geospatial tasks via ChatGPT, and multi-modal geospatial embeddings
 
-> The response shape above is illustrative. Update it to match the actual API.
+Imagery sources: NASA, ESA Copernicus, USGS.
 
 ---
 
-## Adding a new model
+## How It Compares
 
-Models are registered in the model registry, so new tools plug in without changes to the orchestrator.
+| Solution | NL Chat | VQA / Grounding | Change Analysis | Optical + SAR | Unified Workflow |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Google Earth Engine | No | No | Yes | Yes | No |
+| ArcGIS Pro | Partial | Partial | Yes | Yes | No |
+| Sentinel Hub / EO Browser | No | No | Partial | Yes | No |
+| QGIS + Plugins | No | Partial | Yes | Partial | No |
+| GeoChat | Yes | Yes | Partial | No | No |
+| RS-ChatGPT / ChatEarthNet | Yes | Partial | No | No | No |
+| ChangeChat | Partial | No | Yes | No | No |
+| Prithvi / AlphaEarth | No | No | Partial | No | No |
+| Chat2Geo | Yes | Partial | Partial | Partial | Partial |
+| **SatQuery AI** | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
 
-1. Implement the tool interface in `backend/app/tools/<your_tool>/`.
-2. Declare its supported modalities, input requirements, and permitted parameters.
-3. Register it in `backend/app/registry/`.
-
-The orchestrator will start considering it for matching queries.
-
----
-
-## Evaluation
-
-| Task | Benchmark |
-|---|---|
-| Captioning / grounding / VQA | VRSBench, RSVQA |
-| Change-based VQA | CDVQA |
-| Optical–SAR analysis | Co-registered optical–SAR pairs (e.g. SEN1-2) |
+Existing tools each cover part of the problem, spread across separate workflows. SatQuery AI brings intent routing, VQA, grounding, change analysis, and optical–SAR fusion into one conversational workflow with visual evidence, confidence, and an execution trace.
 
 ---
 
-## Roadmap
+## Challenges and Approach
 
-- [ ] Single-image VQA
-- [ ] Captioning and text-guided grounding
-- [ ] Bi-temporal change description and change VQA
-- [ ] Change maps
-- [ ] Optical–SAR joint analysis
-- [ ] Agentic controller with execution trace
-- [ ] Input compatibility checker (GeoTIFF/TIFF)
-- [ ] Downloadable reports
-- [ ] BigEarthNet adaptation + benchmark evaluation
-- [ ] Additional sensors and data sources
+- **Compatibility** (models expect different input formats): a standardized preprocessing layer normalizes inputs.
+- **Compute** (some models are heavy for local use): pre-trained lightweight models and cloud computing.
+- **Scope** (many analysis capabilities to integrate): MVP-first, core tasks first.
 
 ---
 
-## Known limitations
+## Impact
 
-- Different models expect different input formats, so everything goes through a shared preprocessing layer.
-- Some models are heavy for local machines. Use lightweight variants or cloud GPU.
-- Answer quality depends on the underlying adapted models and on well co-registered inputs.
+- Natural-language satellite analysis for non-technical users in agriculture, disaster management, and urban planning
+- Faster decision support without complex GIS workflows
+- Explainable results backed by visual evidence
+- Lower cost: less dependence on expensive GIS tools and manual analysis
+- Scalable and modular through pre-trained models and cloud deployment
+- Supports disaster response, precision agriculture, and sustainable monitoring
 
 ---
 
-## Contributing
+## Links
 
-PRs and issues are welcome.
-
-1. Fork the repo
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Commit: `git commit -m "Add your feature"`
-4. Push and open a PR
+- **Project documentation:** _add Google Drive link_
+- **Repository:** _add GitHub link_
 
 ---
 
@@ -298,10 +274,4 @@ MIT. See [LICENSE](LICENSE).
 
 ---
 
-## Acknowledgements
-
-BigEarthNet, VRSBench, RSVQA, CDVQA, SEN1-2, GeoChat, ChangeChat, RS-ChatGPT, Chat2Geo, Prithvi, AlphaEarth, DOTA, and the Copernicus / NASA / USGS open data programmes.
-
----
-
-**Built by [Abhinav](https://github.com/abhinavv-13)**
+**Built by [Abhinav](https://github.com/abhinavv-13) and team**
