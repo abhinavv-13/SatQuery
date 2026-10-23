@@ -1,211 +1,195 @@
-# SatQuery AI
+# 🛰️ SatQuery AI
 
-An interactive vision-language system for analyzing multimodal remote-sensing imagery through natural-language queries.
+**An agentic vision-language assistant for remote sensing imagery. Ask questions about satellite images in plain English and get answers backed by visual evidence.**
 
-SatQuery AI routes text queries and satellite imagery (`GeoTIFF`/`TIFF`, `PNG`, `JPEG`) to domain-adapted remote-sensing models. Instead of relying on a single generic vision-language model, the backend validates image metadata, classifies the task intent, runs the appropriate specialist pipeline (single-image VQA, region grounding, bi-temporal change detection, or optical-SAR fusion), and returns grounded answers with visual overlays and an execution trace.
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-Frontend-61DAFB?logo=react&logoColor=black)
+![PyTorch](https://img.shields.io/badge/PyTorch-Models-EE4C2C?logo=pytorch&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+---
+
+## Overview
+
+Satellite imagery is useful for agriculture, disaster response, urban planning, forest monitoring, and water-resource assessment. But getting answers out of it usually means knowing GIS tools, picking the right model, and tuning task-specific parameters.
+
+Most remote-sensing AI is also built as a single-task tool (only classification, only detection, only change detection), and a generic VLM can't handle SAR, multispectral bands, or multi-date pairs reliably.
+
+**SatQuery AI** fixes this with an agentic layer on top of specialist remote-sensing models. You upload imagery and type a question. The system validates the inputs, picks the right model(s), runs them, fuses the outputs, and returns:
+
+- a text answer
+- visual evidence (highlighted regions, bounding boxes, change maps)
+- a confidence estimate
+- an execution trace showing exactly which models ran and with what parameters
+
+```
+"What changed between these two dates, and where?"
+"Highlight the water body in this image."
+"Use the optical and SAR images together to find built-up and water-covered regions."
+"Has the built-up area increased, decreased, or stayed the same?"
+```
 
 ---
 
 ## Features
 
-- **Natural-Language Query Interface**: Query optical, multispectral, and SAR satellite images without manual GIS preprocessing.
-- **Task Routing & Orchestration**: Validates image count, format, coordinate reference system (CRS), and modality before selecting specialist models from the registry.
-- **Single-Image Analysis**:
-  - Visual Question Answering (VQA)
-  - Scene captioning and land-cover description
-  - Text-guided region grounding (bounding boxes and segmentation masks)
-- **Bi-Temporal Change Analysis**: Processes co-registered multi-date image pairs to generate spatial change masks, quantify land-cover shifts, and answer change-related queries (CDVQA).
-- **Optical-SAR Cross-Modal Fusion**: Extracts combined structural and spectral information from co-registered optical/multispectral and Synthetic Aperture Radar (SAR) pairs.
-- **Execution Trace & Visual Evidence**: Returns model confidence scores, execution time, applied parameters, and toggleable map layers (`Optical`, `SAR`, `NDVI`, `Change Map`).
+| Capability | Description |
+|---|---|
+| **Single-image VQA** | Ask free-form questions about an optical/multispectral or SAR image |
+| **Captioning / Grounding** | Scene description and text-guided region highlighting |
+| **Change analysis** | Change description, change-based VQA, and change maps from bi-temporal pairs |
+| **Optical–SAR analysis** | Joint extraction from co-registered optical and SAR pairs (e.g. built-up and water regions) |
+| **Agentic orchestration** | Query → task classification → input validation → model selection → execution → fusion |
+| **Evidence-grounded output** | Annotations, bounding boxes, change maps, confidence score |
+| **Auditable execution trace** | Selected task, models/tools used, permitted parameters, and outputs |
+| **Report export** | Download results as a report |
+| **Model registry** | Plug in new specialist models without touching the core |
 
 ---
 
-## Architecture
+## How it works
 
-```text
-User Input (Satellite Images + Text Query)
-       │
-       ▼
-┌─────────────────────────────────────────────────────────┐
-│ 1. Input & Metadata Validation                          │
-│    - Image Information Collector (CRS, bands, stats)    │
-│    - Query Intent Detection                             │
-│    - Task & Modality Identification                     │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────┐
-│ 2. AI Orchestrator & Model Registry                     │
-│    - Validates compatibility & selects workflow         │
-│    - Routes to Chat Layer or Specialist Pipeline        │
-└──────┬───────────────────┬───────────────────────┬──────┘
-       │                   │                       │
-       ▼                   ▼                       ▼
-┌──────────────┐   ┌───────────────┐   ┌──────────────────┐
-│ Single-Image │   │ Bi-Temporal   │   │ Cross-Modal      │
-│ Pipeline     │   │ Pipeline      │   │ Pipeline         │
-│ - VQA        │   │ - Co-reg      │   │ - Optical + SAR  │
-│ - Captioning │   │ - Change Map  │   │   Fusion         │
-│ - Grounding  │   │ - CDVQA       │   │ - Feature Extr.  │
-└──────┬───────┘   └───────┬───────┘   └─────────┬────────┘
-       │                   │                     │
-       └───────────────────┼─────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────┐
-│ 3. Result Fusion & Output Generation                    │
-│    - Text explanation + confidence score                │
-│    - Visual overlays (boxes, masks, change maps)        │
-│    - Auditable execution summary (JSON + Web UI)        │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A[User: images + natural-language query] --> B[Input Validation<br/>count · modality · format · metadata · compatibility]
+    B --> C[Intent Classifier]
+    C --> D{Analysis or Chat?}
+    D -- Chat --> E[LLM Chat Layer]
+    D -- Satellite analysis --> F[Task Router / Orchestrator]
+    R[(Model Registry)] --> F
+    F --> G[VQA · Captioning · Grounding]
+    F --> H[Temporal Comparison<br/>registration · change detection · change VQA]
+    F --> I[Optical–SAR Fusion]
+    G --> J[Result Fusion<br/>integration · evidence · confidence · validation]
+    H --> J
+    I --> J
+    E --> K
+    J --> K[Output Generation<br/>text · visual evidence · metadata]
+    K --> L[Web Interface]
 ```
 
-### Core Components
+**Pipeline stages**
 
-| Component | Description |
-| :--- | :--- |
-| **Input Validator** | Checks file format (`GeoTIFF`/`TIFF`), band count, resolution, and spatial co-registration across paired inputs. |
-| **Intent Classifier** | Parses the user prompt to determine whether the request requires general chat, single-image VQA/grounding, change detection, or multimodal fusion. |
-| **Model Registry** | Modular configuration allowing specialist weights and pipelines to be added or swapped without changing core routing logic. |
-| **Specialist Pipelines** | Fine-tuned remote-sensing models adapted on `BigEarthNet` and evaluated across `VRSBench`, `RSVQA`, `CDVQA`, and `SEN1-2`. |
-| **Result Fusion** | Combines spatial outputs (bounding boxes, segmentation masks) with natural-language responses and logs the execution trace. |
-
----
-
-## Supported Inputs & Tasks
-
-| Input Type | Modalities | Supported Tasks | Example Queries |
-| :--- | :--- | :--- | :--- |
-| **Single Image** | Optical, Multispectral, or SAR | VQA, Scene Captioning, Region Grounding | *"Describe the land-cover and major objects visible in this image."*<br>*"Highlight the water body referred to in the query."* |
-| **Bi-Temporal Pair** | Two co-registered images ($t_1, t_2$) | Change Detection, Change Description, CDVQA | *"What changed between these two dates, and where did the change occur?"*<br>*"Has the built-up area increased, decreased, or remained unchanged?"* |
-| **Cross-Modal Pair** | Co-registered Optical + SAR pair | Joint Feature Extraction, Flood/Water & Built-Up Mapping | *"Use the optical and SAR images together to identify built-up and water-covered regions."* |
+1. **Input understanding:** checks image count, modality, format, and metadata, and collects dimensions and statistics.
+2. **Intent detection:** works out what the user wants to analyse.
+3. **Orchestrator:** selects the workflow and models from the registry, and sets only permitted parameters.
+4. **Specialist execution:** runs VQA, grounding, change detection, or optical–SAR analysis.
+5. **Result fusion:** combines text and spatial outputs, estimates confidence, and validates results.
+6. **Output generation:** returns the answer, visual evidence, and an execution summary.
 
 ---
 
-## Tech Stack
+## Supported inputs
 
-- **Frontend**: React.js, Tailwind CSS, JavaScript
-- **Backend**: Python, FastAPI, REST API
-- **AI / ML**: PyTorch, Hugging Face Transformers, Together AI (LLM orchestration)
-- **Image & Geospatial Processing**: OpenCV, Pillow, NumPy, Rasterio / GDAL
-- **Datasets & Benchmarks**:
-  - `BigEarthNet` (Multisensor Sentinel-1 SAR & Sentinel-2 Optical adaptation)
-  - `VRSBench` & `RSVQA` (Single-image VQA, captioning, and grounding)
-  - `CDVQA` & `SECOND` (Bi-temporal change question answering and segmentation)
-  - `SEN1-2` (Optical-SAR fusion)
+| Input type | Description | Used for |
+|---|---|---|
+| Single image | One optical / multispectral / SAR image | VQA, captioning, grounding |
+| Cross-modal pair | Co-registered optical + SAR of the same area | Joint information extraction |
+| Bi-temporal pair | Two images of the same area at different times | Change detection, description, change VQA |
+
+**Formats:** GeoTIFF / TIFF for geospatial imagery. PNG / JPEG are accepted only for public benchmark datasets.
 
 ---
 
-## Comparison with Existing Tools
+## Remote-sensing adaptation
 
-| Platform / Model | Natural-Language Chat | VQA / Grounding | Change Analysis | Optical + SAR | Unified Workflow |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Google Earth Engine** | No | No | Yes | Yes | No |
-| **ArcGIS Pro** | Partial | Partial | Yes | Yes | No |
-| **Sentinel Hub / EO Browser** | No | No | Partial | Yes | No |
-| **QGIS + Plugins** | No | Partial | Yes | Partial | No |
-| **GeoChat** | Yes | Yes | Partial | No | No |
-| **RS-ChatGPT / ChatEarthNet** | Yes | Partial | No | No | No |
-| **ChangeChat** | Partial | No | Yes | No | No |
-| **Prithvi / AlphaEarth** | No | No | Partial | No | No |
-| **Chat2Geo** | Yes | Partial | Partial | Partial | Partial |
-| **SatQuery AI** | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+A general-purpose VLM isn't enough here, so at least one visual / vision-language component is adapted to remote sensing data.
+
+| Purpose | Dataset |
+|---|---|
+| Image–text adaptation on multisensor data | [BigEarthNet](https://huggingface.co/datasets/bigearthnet) |
+| Captioning, grounding, VQA evaluation | VRSBench, RSVQA |
+| Change-based VQA evaluation | CDVQA |
+| Optical–SAR paired data | SEN1-2 |
+
+Related work this project builds on or draws from: GeoChat, ChangeChat, RS-ChatGPT, Chat2Geo, Prithvi-100M, AlphaEarth, DOTA.
 
 ---
 
-## Project Structure
+## Tech stack
 
-```text
+| Layer | Tools |
+|---|---|
+| Frontend | React.js, Tailwind CSS, JavaScript |
+| Backend | FastAPI, Python, REST API, JSON |
+| ML / RS | PyTorch, Hugging Face Transformers, OpenCV, NumPy, Pillow |
+| LLM | Together AI (chat layer) |
+| Infra | GPU / cloud GPU for inference |
+| Tooling | Git, GitHub |
+
+---
+
+## Project structure
+
+> Suggested layout. Adjust to match the repo.
+
+```
 satquery-ai/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py                    # FastAPI entrypoint
-│   │   ├── config.py                  # Environment & registry settings
-│   │   ├── api/
-│   │   │   ├── routes_query.py        # Query & analysis endpoints
-│   │   │   ├── routes_upload.py       # Image upload & metadata validation
-│   │   │   └── routes_reports.py      # Report export
-│   │   ├── orchestrator/
-│   │   │   ├── intent_classifier.py   # Task & query intent classification
-│   │   │   ├── input_validator.py     # Format, CRS, and co-registration checks
-│   │   │   ├── router.py              # Workflow planner & model selector
-│   │   │   └── fusion.py              # Output integration & confidence calculation
-│   │   ├── specialists/
-│   │   │   ├── registry.py            # Model Registry
-│   │   │   ├── vqa_grounding.py       # Single-image VQA, captioning & grounding
-│   │   │   ├── change_analysis.py     # Bi-temporal CDVQA & change mask generation
-│   │   │   └── optical_sar_fusion.py  # Optical-SAR fusion pipeline
-│   │   └── preprocessing/
-│   │       ├── geotiff_loader.py      # GeoTIFF band normalization
-│   │       └── indices.py             # NDVI, NDWI & SAR preprocessing
-│   ├── weights/                       # Model checkpoints & adapters
+│   │   ├── main.py              # FastAPI entrypoint
+│   │   ├── api/                 # REST routes
+│   │   ├── orchestrator/        # intent classifier, router, planner
+│   │   ├── registry/            # model/tool registry
+│   │   ├── preprocessing/       # validation, normalization, metadata
+│   │   ├── tools/
+│   │   │   ├── vqa/
+│   │   │   ├── grounding/
+│   │   │   ├── change/
+│   │   │   └── optical_sar/
+│   │   ├── fusion/              # result fusion + confidence
+│   │   └── reports/             # report generation
+│   ├── training/                # BigEarthNet adaptation scripts
 │   └── requirements.txt
 ├── frontend/
-│   ├── public/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── MapCanvas.jsx          # Image viewer & overlay renderer
-│   │   │   ├── LayerController.jsx    # Optical, SAR, NDVI & Change Map toggles
-│   │   │   ├── QueryConsole.jsx       # Query input & presets
-│   │   │   ├── ExecutionTracePanel.jsx# Confidence & execution trace panel
-│   │   │   └── Sidebar.jsx            # Session history & sample loader
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
-│   └── tailwind.config.js
-├── scripts/
-│   ├── finetune_bigearthnet.py        # Domain adaptation script
-│   └── evaluate_benchmarks.py         # Benchmark evaluation (VRSBench, RSVQA, CDVQA)
+│   └── package.json
+├── docs/
 └── README.md
 ```
 
 ---
 
-## Setup & Installation
+## Getting started
 
 ### Prerequisites
 
 - Python 3.10+
-- Node.js 18+ and npm
-- CUDA-enabled GPU (optional, recommended for local inference)
+- Node.js 18+
+- CUDA-capable GPU recommended for the larger models (lightweight models can run on CPU)
 
-### 1. Clone the Repository
+### 1. Clone
 
 ```bash
-git clone https://github.com/your-username/satquery-ai.git
+git clone https://github.com/abhinavv-13/satquery-ai.git
 cd satquery-ai
 ```
 
-### 2. Backend Setup
+### 2. Backend
 
 ```bash
 cd backend
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-# Linux / macOS
-source venv/bin/activate
-
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in `backend/`:
+Create a `.env` file:
 
 ```env
-TOGETHER_API_KEY=your_api_key_here
-ORCHESTRATOR_MODEL=meta-llama/Llama-3-70b-chat-hf
-DEVICE=cuda
-MODEL_REGISTRY_PATH=./weights/registry_config.json
+TOGETHER_API_KEY=your_key_here
+MODEL_DIR=./models
+DEVICE=cuda                      # or cpu
 ```
 
-Start the FastAPI server:
+Run the API:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --reload --port 8000
 ```
 
-### 3. Frontend Setup
+### 3. Frontend
 
 ```bash
 cd frontend
@@ -213,86 +197,111 @@ npm install
 npm run dev
 ```
 
-The web interface will be available at `http://localhost:5173`.
+Open `http://localhost:5173`.
 
 ---
 
-## API Usage & Execution Trace
+## Usage
 
-### Request (`POST /api/v1/analyze`)
+1. Upload one image, an optical + SAR pair, or a before/after pair.
+2. SatQuery AI checks the inputs and shows what it detected (modality, format, compatibility).
+3. Type a question, or use a preset (*Describe scene*, *Detect water*, *What changed?*).
+4. Review the answer, visual evidence, confidence, and execution trace.
+5. Download the report.
+
+### Example API call
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/analyze" \
-  -F "query=What changed between these two dates, and where did the change occur?" \
-  -F "image_t1=@./samples/kosi_river_2024_pre.tif" \
-  -F "image_t2=@./samples/kosi_river_2024_post.tif"
+curl -X POST http://localhost:8000/api/query \
+  -F "images=@before.tif" \
+  -F "images=@after.tif" \
+  -F "query=What changed between these two dates, and where?"
 ```
-
-### Response
 
 ```json
 {
-  "status": "success",
-  "query": "What changed between these two dates, and where did the change occur?",
-  "answer": "The scene shows the Kosi River basin with surrounding agricultural land. Significant flooding is visible in the northern sectors, with a 34% increase in surface water coverage. A distinct built-up settlement is grounded in the northeast quadrant. SAR cross-validation is recommended for deeper subsidence analysis.",
-  "confidence": 0.92,
-  "visual_evidence": {
-    "change_map_url": "/outputs/masks/kosi_flood_change_mask.png",
-    "bounding_boxes": [
-      {
-        "label": "flooded_water_expansion",
-        "bbox": [312, 240, 645, 590],
-        "confidence": 0.94
-      },
-      {
-        "label": "built_up_settlement",
-        "bbox": [520, 310, 610, 405],
-        "confidence": 0.89
-      }
-    ],
-    "available_layers": ["Optical", "SAR", "NDVI", "Change Map"]
-  },
-  "execution_trace": {
-    "selected_task": "bi_temporal_change_vqa_and_grounding",
-    "input_validation": {
-      "image_count": 2,
-      "format": "GeoTIFF",
-      "crs": "EPSG:32645",
-      "co_registered": true
-    },
-    "models_used": [
-      {
-        "task": "vqa_grounding",
-        "model": "RSVQA-LLaVA",
-        "parameters": { "temperature": 0.1, "box_threshold": 0.35 }
-      },
-      {
-        "task": "change_detection",
-        "model": "CDVQA",
-        "parameters": { "change_threshold": 0.5 }
-      }
-    ],
-    "execution_time_sec": 2.3,
-    "steps": 4
+  "task": "change_vqa",
+  "answer": "...",
+  "confidence": 0.0,
+  "evidence": { "change_map": "...", "regions": [] },
+  "trace": {
+    "models": ["..."],
+    "parameters": {},
+    "steps": []
   }
 }
 ```
 
+> The response shape above is illustrative. Update it to match the actual API.
+
 ---
 
-## References
+## Adding a new model
 
-- **BigEarthNet**: [https://huggingface.co/datasets/bigearthnet](https://huggingface.co/datasets/bigearthnet)
-- **VRSBench**: [https://github.com/Chen-Delin/VRSBench](https://github.com/Chen-Delin/VRSBench)
-- **RSVQA**: [https://ieeexplore.ieee.org/document/9172634](https://ieeexplore.ieee.org/document/9172634)
-- **CDVQA / SECOND**: [https://arxiv.org/abs/2305.16318](https://arxiv.org/abs/2305.16318)
-- **SEN1-2**: [https://github.com/leonardobeno/SEN1-2](https://github.com/leonardobeno/SEN1-2)
-- **GeoChat**: [https://arxiv.org/abs/2311.15826](https://arxiv.org/abs/2311.15826)
-- **ChangeChat**: [https://github.com/ChangeChat/ChangeChat](https://github.com/ChangeChat/ChangeChat)
-- **DOTA**: [https://captain-whu.github.io/DOTA/](https://captain-whu.github.io/DOTA/)
+Models are registered in the model registry, so new tools plug in without changes to the orchestrator.
+
+1. Implement the tool interface in `backend/app/tools/<your_tool>/`.
+2. Declare its supported modalities, input requirements, and permitted parameters.
+3. Register it in `backend/app/registry/`.
+
+The orchestrator will start considering it for matching queries.
+
+---
+
+## Evaluation
+
+| Task | Benchmark |
+|---|---|
+| Captioning / grounding / VQA | VRSBench, RSVQA |
+| Change-based VQA | CDVQA |
+| Optical–SAR analysis | Co-registered optical–SAR pairs (e.g. SEN1-2) |
+
+---
+
+## Roadmap
+
+- [ ] Single-image VQA
+- [ ] Captioning and text-guided grounding
+- [ ] Bi-temporal change description and change VQA
+- [ ] Change maps
+- [ ] Optical–SAR joint analysis
+- [ ] Agentic controller with execution trace
+- [ ] Input compatibility checker (GeoTIFF/TIFF)
+- [ ] Downloadable reports
+- [ ] BigEarthNet adaptation + benchmark evaluation
+- [ ] Additional sensors and data sources
+
+---
+
+## Known limitations
+
+- Different models expect different input formats, so everything goes through a shared preprocessing layer.
+- Some models are heavy for local machines. Use lightweight variants or cloud GPU.
+- Answer quality depends on the underlying adapted models and on well co-registered inputs.
+
+---
+
+## Contributing
+
+PRs and issues are welcome.
+
+1. Fork the repo
+2. Create a branch: `git checkout -b feature/your-feature`
+3. Commit: `git commit -m "Add your feature"`
+4. Push and open a PR
 
 ---
 
 ## License
 
-MIT License
+MIT. See [LICENSE](LICENSE).
+
+---
+
+## Acknowledgements
+
+BigEarthNet, VRSBench, RSVQA, CDVQA, SEN1-2, GeoChat, ChangeChat, RS-ChatGPT, Chat2Geo, Prithvi, AlphaEarth, DOTA, and the Copernicus / NASA / USGS open data programmes.
+
+---
+
+**Built by [Abhinav](https://github.com/abhinavv-13)**
