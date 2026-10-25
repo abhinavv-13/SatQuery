@@ -162,8 +162,8 @@ satquery-ai/
 ### 1. Clone
 
 ```bash
-git clone https://github.com/abhinavv-13/<repo-name>.git
-cd <repo-name>
+git clone https://github.com/abhinavv-13/SatQuery.git
+cd SatQuery
 ```
 
 ### 2. Backend
